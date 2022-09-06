@@ -30,7 +30,7 @@ else if (window.location.href.indexOf("/artist/") !== -1) {
 } else if (window.location.href.indexOf("/show/") !== -1) {
     lookType = "shows"
     replaceLink = "show";
-} else {
+} else if (window.location.href == "https://open.spotify.com/") {
     lookType = "me/player/recently-played";
     replaceLink = window.location.href;
 }
