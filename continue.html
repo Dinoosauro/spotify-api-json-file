@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+
+<head>
+    <title>Favourites to Playlist Converter</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Work+Sans">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body style="background-color: rgb(22,22,22);">
+    <div style="margin: 10px;">
+        <h1>Spotify Favourites to Playlist</h1> <br>
+        <i>You're one step away to convert your saved track to a playlist!</i> <br>
+        <h2>Choose playlist name</h2>
+        <textarea id="playlistName"></textarea> <br>
+        <i>You'll be able to change the description and set it to private from the Spotify app/website.</i> <br> <br>
+        <label for="order">Order the playlist with the following criteria:</label>
+        <select id="order">
+          <option value="date">Date</option>
+          <option value="artist">Artist name</option>
+          <option value="album">Album name</option>
+          <option value="song">Song name</option>
+        </select>
+        <br><br>
+        <input type="checkbox" id="fromLast" checked="true"><label for="fromLast">Sort from the last song to the first
+            one</label><br> <br><br>
+        <button id="thisButton">Convert</button> <br>
+        <label id="progress">This may take a while. Don't worry, the webpage will be updated when your playlist is
+            ready.</label>
+            <div style="position: absolute; bottom: 0;">
+                <i style="font-size: 12px;">Spotify is trademark of Spotify AB, which is not affiliated to this website.
+                </i> <br> <i style="font-size: 8px;">I know, graphically this website isn't impressive. But the important
+                    thing is that it should work.</i>
+            </div>
+    
+    </div>
+    <script>
+        document.getElementById("thisButton").onclick =  function() {
+                 go();
+            }
+         function go() {
+            var token = window.location.href.substring(window.location.href.indexOf("access_token=")).replace("access_token=", "");
+            token = token.substring(0, token.indexOf("&"));
+            var id = Array(1).fill("");
+            var songName = Array(1).fill("");
+            var artistName = Array(1).fill("");
+            var albumName = Array(1).fill("");
+            var progresionInt = 0;
+            var thisLink = "https://api.spotify.com/v1/me/tracks";
+             saveTrack();
+             function saveTrack() {
+                var build =  requestBuild(thisLink);
+                var parse = JSON.parse(build);
+                var getArrayItem = parse.items;
+                for (let i = 0; i < getArrayItem.length; i++) {
+                    id[progresionInt] = parse.items[i].track.uri;
+                    songName[progresionInt] = parse.items[i].track.name + "[" + progresionInt + "]";
+                    artistName[progresionInt] = parse.items[i].track.album.artists[0].name + "[" + progresionInt + "]";
+                    albumName[progresionInt] = parse.items[i].track.album.name + "[" + progresionInt + "]";
+                    progresionInt++;
+                    document.getElementById("progress").innerHTML = "Getting element " + progresionInt + " from your saved tracks";
+                }
+                for (let i = 0; i < songName.length; i++) {
+                    songName[i] = songName[i].toLowerCase();
+}
+for (let i = 0; i < artistName.length; i++) {
+    artistName[i] = artistName[i].toLowerCase();
+}
+for (let i = 0; i < albumName.length; i++) {
+    albumName[i] = albumName[i].toLowerCase();
+}
+
+                if (build.indexOf("\"next\" : \"") !== -1) {
+                    var getNext = build.substring(build.indexOf("\"next\" : \"")).replace("\"next\" : \"");
+                    getNext = getNext.substring(0, getNext.indexOf("\""));
+                    thisLink = getNext.substring(getNext.indexOf("https://"));
+                     saveTrack();
+                } else {
+                    document.getElementById("progress").innerHTML = "Creating playlist...";
+                    var getUserID = JSON.parse( requestBuild("https://api.spotify.com/v1/me"));
+                    var userID = getUserID.id;
+                    var maxinumReached = false;
+                    var playlistName = document.getElementById("playlistName").value.replaceAll("\"", "");
+                    var newId =  postBuild("https://api.spotify.com/v1/users/" + userID + "/playlists", "{\"name\":\"" + playlistName + "\",\"description\":\"Converted from my favourites using spotify-saved-tracks-to-playlsit\",\"public\":true}").responseText;
+                    newId = newId.substring(newId.indexOf("\"id\" : \"")).replace("\"id\" : \"");
+                    newId = newId.substring(0, newId.indexOf("\"")).replace("undefined", "");
+                    var next = 0;
+                    artistName.sort();
+                                        var useThisArray = artistName;
+                        var useValue = document.getElementById("order");
+                        if (useValue.selectedIndex == 2) {
+                                        albumName.sort();
+                                        useThisArray = albumName;
+                                    } else if (useValue.selectedIndex == 3) {
+                                        songName.sort();
+                                        useThisArray = songName;
+                                    } 
+                                    if (document.getElementById("fromLast").checked == true) { 
+                                        // since reverse function doesn't work that well, we'll try to do that in another way.
+                                        useThisArray.reverse();
+                                    } 
+                     function addItems() {
+                        var joinTrack = "https://api.spotify.com/v1/playlists/" + newId + "/tracks?uris=";
+                        var nextPlus = next + 80;
+                        
+                        for (let i = next; i < nextPlus; i++) {
+                            if (id.length > i) {
+                                if (useValue.value == 0) {
+                                    if (document.getElementById("fromLast").checked == true) {
+                                    joinTrack = joinTrack + id[i].replaceAll(":", "%3A") + "%2C";
+                                } else {
+                                    joinTrack = joinTrack + id[id.length - 1 - i].replaceAll(":", "%3A") + "%2C";
+                                }
+                                } else {
+                                    var getId = useThisArray[i].substring(useThisArray[i].lastIndexOf("[") + 1);
+                                    getId = getId.substring(0, getId.indexOf("]"));
+                                    joinTrack = joinTrack + id[getId].replaceAll(":", "%3A") + "%2C";
+                                }
+                                
+                            }
+                            next++;
+                        }
+                        document.getElementById("progress").innerHTML = "Added " + next + " songs to the new playlist";
+                        joinTrack = joinTrack.substring(0, joinTrack.length - 3);
+                         postBuild(joinTrack, "");
+                        if ((id.length - 1) > next) {
+                             addItems();
+                        } else {
+                            if (window.confirm("Conversion ended. Do you want to open your playlist?")) {
+                                window.open("https://open.spotify.com/playlist/" + newId);
+                            }
+                            document.getElementById("progress").innerHTML = "Playlist converted. You can close this website.";
+                        }
+                    }
+                    if ((id.length - 1) > next) {
+                         addItems();
+                    }
+                }
+            }
+             function requestBuild(link) {
+                var xmlHttp = new XMLHttpRequest();
+                xmlHttp.open("GET", link, false);
+                xmlHttp.setRequestHeader("Content-Type", "application/json");
+                xmlHttp.setRequestHeader("Accept", "application/json");
+                xmlHttp.setRequestHeader("Authorization", "Bearer " + token);
+                xmlHttp.send(null);
+                return xmlHttp.responseText;
+            }
+             function postBuild(link, sendText) {
+                var postRequest = new XMLHttpRequest();
+                postRequest.open("POST", link, false);
+                postRequest.setRequestHeader("Content-Type", "application/json");
+                postRequest.setRequestHeader("Accept", "application/json");
+                postRequest.setRequestHeader("Authorization", "Bearer " + token);
+                postRequest.send(sendText);
+                return postRequest;
+            }
+        }
+    </script>
+</body>
