@@ -1,6 +1,7 @@
 let lookType = "playlists";
 let replaceLink = "playlist";
 let addAfter = "";
+// that's not really elegant, but it works
 if (window.location.href.indexOf("collection/tracks") !== -1) {
     lookType = "me/tracks";
     replaceLink = "collection/tracks";
@@ -23,8 +24,7 @@ if (window.location.href.indexOf("collection/tracks") !== -1) {
     replaceLink = "artist";
     lookType = "artists";
     addAfter = "/albums";
-}
-else if (window.location.href.indexOf("/artist/") !== -1) {
+} else if (window.location.href.indexOf("/artist/") !== -1) {
     lookType = "artists";
     replaceLink = "artist";
 } else if (window.location.href.indexOf("/show/") !== -1) {
@@ -37,7 +37,6 @@ else if (window.location.href.indexOf("/artist/") !== -1) {
 
 let getToken = document.body.innerHTML.substring(document.body.innerHTML.indexOf("\"accessToken\":\"")).replace("\"accessToken\":\"", "");
 getToken = getToken.substring(0, getToken.indexOf("\""));
-console.log("ciao: " + getToken);
 let playlistId = window.location.href.substring(window.location.href.indexOf(replaceLink)).replace(replaceLink, "");
 if (addAfter.indexOf("/albums") !== -1) {
     playlistId = playlistId.substring(0, playlistId.indexOf("/discography"));
@@ -45,24 +44,37 @@ if (addAfter.indexOf("/albums") !== -1) {
 if (playlistId.indexOf("?") !== -1) {
     playlistId = playlistId.substring(0, playlistId.indexOf("?"));
 }
-console.log(lookType);
-console.log(playlistId);
-console.log(addAfter);
 let fetchPlaylistData = "https://api.spotify.com/v1/" + lookType + playlistId + addAfter;
 let playlistJson = "";
 let playlistName = "";
+let multipleFetch = false;
 function getData() {
+    console.log("Contacting: " + fetchPlaylistData);
     let xmlHttp = new XMLHttpRequest();
     xmlHttp.open("GET", fetchPlaylistData, false);
     xmlHttp.setRequestHeader("Content-Type", "application/json");
     xmlHttp.setRequestHeader("Accept", "application/json");
     xmlHttp.setRequestHeader("Authorization", "Bearer " + getToken);
     xmlHttp.send(null);
-    playlistJson = playlistJson + xmlHttp.responseText + "\n";
+    if (!multipleFetch) {
+        playlistJson = playlistJson + xmlHttp.responseText + "\n";
+    } else {
+        let temp = xmlHttp.responseText;
+        if (temp.indexOf("\"items\" : [") !== -1) {
+            temp = temp.substring(temp.indexOf("\"items\" : [")).replace("\"items\" : [");
+            if (temp.startsWith("undefined")) {
+                temp = temp.substring(9);
+            }
+            temp = "," + temp;
+        }
+        playlistJson = playlistJson + temp + "\n";
+    }
     if (xmlHttp.responseText.indexOf("\"next\" : \"") !== -1) {
         let getNext = xmlHttp.responseText.substring(xmlHttp.responseText.indexOf("\"next\" : \"")).replace("\"next\" : \"");
         getNext = getNext.substring(0, getNext.indexOf("\""));
         fetchPlaylistData = getNext.substring(getNext.indexOf("https://"));
+        playlistJson = playlistJson.substring(0, playlistJson.lastIndexOf("]"));
+        multipleFetch = true;
         getData();
     } else {
         playlistName = playlistJson;
@@ -79,8 +91,9 @@ function getData() {
             playlistName = playlistName.replace("\"name\" : \"", "");
             playlistName = playlistName.substring(0, playlistName.indexOf("\""));
         }
-        console.log(playlistName);
-        console.log(playlistJson);
+        if (multipleFetch) {
+            playlistJson = playlistJson + "\n}";
+        }
         forceDownload('data:text/plain;charset=utf-8,' + encodeURIComponent(playlistJson), playlistName + "-exported.json");
     }
 }
